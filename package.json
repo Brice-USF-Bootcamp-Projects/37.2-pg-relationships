@@ -1,0 +1,26 @@
+{
+  "name": "37.1_node_pg_intro",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "test": "jest",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "brice nelson",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Brice-USF-Bootcamp-Projects/37.1-Node-PG-Intro.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Brice-USF-Bootcamp-Projects/37.1-Node-PG-Intro/issues"
+  },
+  "homepage": "https://github.com/Brice-USF-Bootcamp-Projects/37.1-Node-PG-Intro#readme",
+  "description": "",
+  "dependencies": {
+    "express": "^4.21.2",
+    "jest": "^29.7.0",
+    "pg": "^8.13.1"
+  }
+}
