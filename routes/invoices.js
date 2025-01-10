@@ -1,134 +1,141 @@
 // routes/invoices.js
 
 const express = require("express");
-const ExpressError = require('../expressError')
+const ExpressError = require("../expressError");
 const router = express.Router();
-const db = require('../db')
+const db = require("../db");
 
-// Return info on invoices: like {invoices: [{id, comp_code}, ...]}
+// Return info on invoices: {invoices: [{id, comp_code, amt, paid, add_date, paid_date}, ...]}
 router.get("/", async (req, res, next) => {
   try {
-    const results = await db.query('SELECT * FROM invoices');
-    return res.json({ invoices: results.rows })
-  } catch (e) {
-    return next (e)
-  }
-});
-
-// Returns obj on given invoice.
-router.get('/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const results = await db.query ('SELECT * FROM invoices WHERE id = $1', [id])
-    if (results.rows.length === 0) {
-      throw new ExpressError(`Invoice with id of ${ id } does not exist`, 404)
-    }
-    return res.send({invoice: results.rows[0] })
-  } catch (e) { 
-    return next (e)
-  }
-})
-
-
-/** Adds an invoice. Needs to be passed in JSON body of: {comp_code, amt}
-Returns: {invoice: {id, comp_code, amt, paid, add_date, paid_date}} **/
-router.put('/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { comp_code, amt, paid, add_date, paid_date } = req.body;
-
-    // Validate that at least one field is provided
-    if (!comp_code && amt === undefined && paid === undefined && !add_date && !paid_date) {
-      throw new ExpressError("At least one field must be provided to update.", 400);
-    }
-
-    // Dynamically build the update query
-    const fields = [];
-    const values = [];
-    let queryIdx = 1;
-
-    if (comp_code) {
-      fields.push(`comp_code = $${queryIdx++}`);
-      values.push(comp_code);
-    }
-    if (amt !== undefined) {
-      fields.push(`amt = $${queryIdx++}`);
-      values.push(amt);
-    }
-    if (paid !== undefined) {
-      fields.push(`paid = $${queryIdx++}`);
-      values.push(paid);
-    }
-    if (add_date) {
-      const validAddDate = new Date(add_date);
-      if (isNaN(validAddDate)) {
-        throw new ExpressError("Invalid add_date format. Must be a valid date.", 400);
-      }
-      fields.push(`add_date = $${queryIdx++}`);
-      values.push(validAddDate);
-    }
-    if (paid_date) {
-      const validPaidDate = new Date(paid_date);
-      if (isNaN(validPaidDate)) {
-        throw new ExpressError("Invalid paid_date format. Must be a valid date.", 400);
-      }
-      fields.push(`paid_date = $${queryIdx++}`);
-      values.push(validPaidDate);
-    }
-
-    // Ensure we have fields to update
-    if (fields.length === 0) {
-      throw new ExpressError("No valid fields to update.", 400);
-    }
-
-    // Add the ID to the values array
-    values.push(id);
-
-    // Execute the dynamic update query
-    const result = await db.query(
-      `UPDATE invoices
-       SET ${fields.join(", ")}
-       WHERE id = $${queryIdx}
-       RETURNING *`,
-      values
+    const results = await db.query(
+      `SELECT id, comp_code, amt, paid, add_date, paid_date FROM invoices`
     );
-
-    // Check if the invoice exists
-    if (result.rows.length === 0) {
-      throw new ExpressError(`Invoice with id '${id}' does not exist.`, 404);
-    }
-
-    // Return the updated invoice
-    res.json({ invoice: result.rows[0] });
+    return res.json({ invoices: results.rows });
   } catch (e) {
     return next(e);
   }
 });
 
-
-router.delete('/:id', async (req, res, next) => {
+// Return detailed obj on given invoice, including company details
+router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Attempt to delete the invoice
+    const invoiceResult = await db.query(
+      `SELECT id, comp_code, amt, paid, add_date, paid_date FROM invoices WHERE id = $1`,
+      [id]
+    );
+
+    if (invoiceResult.rows.length === 0) {
+      throw new ExpressError(`Invoice with id of ${id} does not exist`, 404);
+    }
+
+    const companyResult = await db.query(
+      `SELECT code, name, description FROM companies WHERE code = $1`,
+      [invoiceResult.rows[0].comp_code]
+    );
+
+    const invoice = invoiceResult.rows[0];
+    invoice.company = companyResult.rows[0];
+
+    return res.json({ invoice });
+  } catch (e) {
+    return next(e);
+  }
+});
+
+// Add a new invoice
+router.post("/", async (req, res, next) => {
+  try {
+    const { comp_code, amt } = req.body;
+
+    if (!comp_code || amt === undefined) {
+      throw new ExpressError("comp_code and amt are required", 400);
+    }
+
+    const companyCheck = await db.query(
+      `SELECT code FROM companies WHERE code = $1`,
+      [comp_code]
+    );
+
+    if (companyCheck.rows.length === 0) {
+      throw new ExpressError(`Company with code of ${comp_code} does not exist`, 404);
+    }
+
+    const result = await db.query(
+      `INSERT INTO invoices (comp_code, amt, paid, add_date, paid_date) 
+       VALUES ($1, $2, false, CURRENT_DATE, null) 
+       RETURNING id, comp_code, amt, paid, add_date, paid_date`,
+      [comp_code, amt]
+    );
+
+    return res.status(201).json({ invoice: result.rows[0] });
+  } catch (e) {
+    return next(e);
+  }
+});
+
+// Update an existing invoice
+router.put("/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { amt, paid } = req.body;
+
+    if (amt === undefined || paid === undefined) {
+      throw new ExpressError("amt and paid are required fields", 400);
+    }
+
+    const currInvoice = await db.query(
+      `SELECT paid, paid_date FROM invoices WHERE id = $1`,
+      [id]
+    );
+
+    if (currInvoice.rows.length === 0) {
+      throw new ExpressError(`Invoice with id '${id}' does not exist.`, 404);
+    }
+
+    let paidDate = null;
+    if (!currInvoice.rows[0].paid && paid) {
+      paidDate = new Date();
+    } else if (!paid) {
+      paidDate = null;
+    } else {
+      paidDate = currInvoice.rows[0].paid_date;
+    }
+
+    const result = await db.query(
+      `UPDATE invoices
+       SET amt = $1, paid = $2, paid_date = $3
+       WHERE id = $4
+       RETURNING id, comp_code, amt, paid, add_date, paid_date`,
+      [amt, paid, paidDate, id]
+    );
+
+    return res.json({ invoice: result.rows[0] });
+  } catch (e) {
+    return next(e);
+  }
+});
+
+// Delete an invoice
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
     const result = await db.query(
       `DELETE FROM invoices WHERE id = $1 RETURNING id`,
       [id]
     );
 
-    // Check if the invoice was found and deleted
     if (result.rows.length === 0) {
       throw new ExpressError(`Invoice with id '${id}' does not exist.`, 404);
     }
 
-    // Return success message
-    res.json({ status: "deleted" });
+    return res.json({ status: "deleted" });
   } catch (e) {
     return next(e);
   }
 });
-
-
-
 
 module.exports = router;

@@ -1,26 +1,35 @@
 {
-  "name": "37.1_node_pg_intro",
+  "name": "37.2_pg_relationships",
   "version": "1.0.0",
   "main": "app.js",
   "scripts": {
     "test": "jest",
     "start": "node server.js"
   },
+  "jest": {
+    "testEnvironment": "node"
+  },
   "keywords": [],
   "author": "brice nelson",
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Brice-USF-Bootcamp-Projects/37.1-Node-PG-Intro.git"
+    "url": "git+https://github.com/Brice-USF-Bootcamp-Projects/37.2-pg-relationships"
   },
   "bugs": {
-    "url": "https://github.com/Brice-USF-Bootcamp-Projects/37.1-Node-PG-Intro/issues"
+    "url": "https://github.com/Brice-USF-Bootcamp-Projects/37.2-pg-relationships/issues"
   },
-  "homepage": "https://github.com/Brice-USF-Bootcamp-Projects/37.1-Node-PG-Intro#readme",
-  "description": "",
+  "homepage": "hhttps://github.com/Brice-USF-Bootcamp-Projects/37.2-pg-relationships#readme",
   "dependencies": {
-    "express": "^4.21.2",
-    "jest": "^29.7.0",
-    "pg": "^8.13.1"
+    "express": "^4.21.2"
+  },
+  "description": "",
+  "devDependencies": {
+    "dotenv": "^16.4.7",
+    "formidable": "^1.2.6",
+    "jest": "^26.6.3",
+    "pg": "^8.13.1",
+    "superagent": "^5.3.1",
+    "supertest": "^6.3.4"
   }
 }
