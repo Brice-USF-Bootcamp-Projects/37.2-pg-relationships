@@ -79,13 +79,15 @@ router.post("/", async (req, res, next) => {
 // Update an existing invoice
 router.put("/:id", async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { amt, paid } = req.body;
+    const { id } = req.params; // Extract invoice ID from the route parameter
+    const { amt, paid } = req.body; // Extract amt and paid from the request body
 
+    // Validate that both fields are present
     if (amt === undefined || paid === undefined) {
       throw new ExpressError("amt and paid are required fields", 400);
     }
 
+    // Check if the invoice exists and get its current status
     const currInvoice = await db.query(
       `SELECT paid, paid_date FROM invoices WHERE id = $1`,
       [id]
@@ -95,15 +97,20 @@ router.put("/:id", async (req, res, next) => {
       throw new ExpressError(`Invoice with id '${id}' does not exist.`, 404);
     }
 
-    let paidDate = null;
-    if (!currInvoice.rows[0].paid && paid) {
-      paidDate = new Date();
-    } else if (!paid) {
-      paidDate = null;
-    } else {
-      paidDate = currInvoice.rows[0].paid_date;
+    // Determine the new `paid_date` value
+    const currPaid = currInvoice.rows[0].paid;
+    const currPaidDate = currInvoice.rows[0].paid_date;
+    let paidDate = currPaidDate; // Default: keep the current `paid_date`
+
+    if (!currPaid && paid) {
+      // Transition from unpaid to paid
+      paidDate = new Date(); // Set to today's date
+    } else if (currPaid && !paid) {
+      // Transition from paid to unpaid
+      paidDate = null; // Set to null
     }
 
+    // Update the invoice in the database
     const result = await db.query(
       `UPDATE invoices
        SET amt = $1, paid = $2, paid_date = $3
@@ -112,11 +119,13 @@ router.put("/:id", async (req, res, next) => {
       [amt, paid, paidDate, id]
     );
 
+    // Respond with the updated invoice
     return res.json({ invoice: result.rows[0] });
-  } catch (e) {
-    return next(e);
+  } catch (err) {
+    return next(err);
   }
 });
+
 
 // Delete an invoice
 router.delete("/:id", async (req, res, next) => {
