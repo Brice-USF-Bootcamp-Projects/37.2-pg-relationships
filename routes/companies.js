@@ -18,18 +18,38 @@ router.get('/', async (req, res, next) => {
 
 
 
-router.get('/:code', async (req, res, next) => {
-  try {
-    const { code } = req.params;
-    const results = await db.query ('SELECT * FROM companies WHERE code =$1', [code])
-    if (results.rows.length === 0) {
-      throw new ExpressError(`Company with code of ${code} does not exist.`, 404)
+  router.get("/:code", async (req, res, next) => {
+    try {
+      const { code } = req.params;
+  
+      // Fetch company details
+      const companyResult = await db.query(
+        `SELECT code, name, description FROM companies WHERE code = $1`,
+        [code]
+      );
+  
+      if (companyResult.rows.length === 0) {
+        throw new ExpressError(`Company with code '${code}' not found`, 404);
+      }
+  
+      // Fetch associated industries
+      const industryResult = await db.query(
+        `SELECT i.industry
+         FROM industries AS i
+         JOIN company_industries AS ci ON i.code = ci.industry_code
+         WHERE ci.company_code = $1`,
+        [code]
+      );
+  
+      const company = companyResult.rows[0];
+      company.industries = industryResult.rows.map((row) => row.industry);
+  
+      return res.json({ company });
+    } catch (err) {
+      return next(err);
     }
-    return res.send({ company: results.rows[0] })
-  } catch (e) {
-    return next (e)
-  }
-})
+  });
+  
 
 
 router.post('/', async (req, res, next) => {
@@ -111,5 +131,64 @@ router.delete('/:code', async (req, res, next) => {
       return next(e);
   }
 });
+
+
+router.get("/industries", async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT i.code, i.industry, 
+              json_agg(ci.company_code) AS companies
+       FROM industries AS i
+       LEFT JOIN company_industries AS ci ON i.code = ci.industry_code
+       GROUP BY i.code`
+    );
+
+    return res.json({ industries: result.rows });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+
+
+router.post("/industries", async (req, res, next) => {
+  try {
+    const { code, industry } = req.body;
+
+    if (!code || !industry) {
+      throw new ExpressError("Code and industry are required fields", 400);
+    }
+
+    const result = await db.query(
+      `INSERT INTO industries (code, industry)
+       VALUES ($1, $2)
+       RETURNING code, industry`,
+      [code, industry]
+    );
+
+    return res.status(201).json({ industry: result.rows[0] });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+
+router.post("/industries/:industryCode/companies/:companyCode", async (req, res, next) => {
+  try {
+    const { industryCode, companyCode } = req.params;
+
+    await db.query(
+      `INSERT INTO company_industries (company_code, industry_code)
+       VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`, // Avoid duplicate entries
+      [companyCode, industryCode]
+    );
+
+    return res.status(201).json({ message: "Industry associated with company" });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 
 module.exports = router;
