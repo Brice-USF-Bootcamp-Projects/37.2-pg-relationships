@@ -21,7 +21,8 @@
   },
   "homepage": "hhttps://github.com/Brice-USF-Bootcamp-Projects/37.2-pg-relationships#readme",
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "slugify": "^1.6.0"
   },
   "description": "",
   "devDependencies": {

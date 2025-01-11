@@ -4,6 +4,7 @@ const express = require("express");
 const ExpressError = require("../expressError")
 const router = express.Router();
 const db = require("../db");
+const slugify = require("slugify");
 
 
 router.get('/', async (req, res, next) => {
@@ -40,10 +41,18 @@ router.post('/', async (req, res, next) => {
       throw new ExpressError("Code, name, and description are required", 400);
     }
 
+    // use slugify to remove any unwanted characters
+    const sanitizedCode = slugify(code, {
+      replacement: '-', // replace spaces and special characters with dashes
+      remove: /[*+~.()'"!:@]/g, // remove specific unwanted characters
+      lower: true, // convert to lowercase
+      strict: true // strip other special characters
+    });
+
     // Insert into the database
     const result = await db.query(
       'INSERT INTO companies (code, name, description) VALUES ($1, $2, $3) RETURNING *',
-      [code, name, description]
+      [sanitizedCode, name, description]
     );
 
     // Return the newly created company
